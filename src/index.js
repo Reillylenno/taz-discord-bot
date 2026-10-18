@@ -357,12 +357,22 @@ try {
 
     if (discordApiResponse.status !== 429) break;
 
-    const rateLimit = await discordApiResponse.json();
-    const retryAfterSeconds = Number(rateLimit.retry_after);
+    const contentType = discordApiResponse.headers.get("content-type") || "unknown";
+    const retryAfterHeader = Number(discordApiResponse.headers.get("retry-after"));
+    const responseBody = await discordApiResponse.text();
+    let retryAfterBody;
+    try {
+      retryAfterBody = Number(JSON.parse(responseBody).retry_after);
+    } catch {
+      retryAfterBody = NaN;
+    }
+    const retryAfterSeconds = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+      ? retryAfterHeader
+      : retryAfterBody;
     const retryDelayMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
       ? Math.ceil(retryAfterSeconds * 1000)
-      : 5_000;
-    console.warn(`Discord API rate limit reached; retrying in ${Math.ceil(retryDelayMs / 1000)} seconds.`);
+      : 60_000;
+    console.warn(`Discord API returned HTTP 429 (${contentType}); retrying in ${Math.ceil(retryDelayMs / 1000)} seconds.`);
     await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
   }
 
