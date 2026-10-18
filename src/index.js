@@ -105,6 +105,10 @@ let shuttingDown = false;
 let controlServer;
 let httpServer;
 
+client.on(Events.ShardConnecting, (shardId) => {
+  console.log(`Connecting Discord gateway shard ${shardId}.`);
+});
+
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
   void pollLiveStreams(client);
@@ -338,8 +342,19 @@ try {
   });
 
   console.log("Connecting to Discord gateway.");
-  await client.login(token);
+  let loginTimeout;
+  try {
+    await Promise.race([
+      client.login(token),
+      new Promise((_, reject) => {
+        loginTimeout = setTimeout(() => reject(new Error("Timed out waiting for the Discord gateway connection.")), 60_000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(loginTimeout);
+  }
 } catch (error) {
+  client.destroy();
   if (controlServer?.listening) {
     await new Promise((resolve) => controlServer.close(resolve));
   }
