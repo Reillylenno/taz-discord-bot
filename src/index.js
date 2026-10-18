@@ -112,6 +112,26 @@ client.once(Events.ClientReady, (readyClient) => {
   twitchPoll.unref();
 });
 
+client.on(Events.Error, (error) => {
+  console.error("Discord client error:", error);
+});
+
+client.on(Events.ShardError, (error, shardId) => {
+  console.error(`Discord gateway shard ${shardId} error:`, error);
+});
+
+client.on(Events.ShardDisconnect, (closeEvent, shardId) => {
+  console.error(`Discord gateway shard ${shardId} disconnected (code ${closeEvent.code}): ${closeEvent.reason || "no reason provided"}`);
+});
+
+client.on(Events.ShardReconnecting, (shardId) => {
+  console.warn(`Discord gateway shard ${shardId} is reconnecting.`);
+});
+
+client.on(Events.ShardReady, (shardId) => {
+  console.log(`Discord gateway shard ${shardId} is ready.`);
+});
+
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isAutocomplete()) {
     const command = commands.get(interaction.commandName);
@@ -317,6 +337,7 @@ try {
     controlServer.listen(controlPath);
   });
 
+  console.log("Connecting to Discord gateway.");
   await client.login(token);
 } catch (error) {
   if (controlServer?.listening) {
