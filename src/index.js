@@ -343,20 +343,38 @@ try {
 
   console.log("Checking Discord API access and bot token.");
   let discordApiResponse;
-  try {
-    discordApiResponse = await fetch("https://discord.com/api/v10/gateway/bot", {
-      headers: { Authorization: `Bot ${token}` },
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch (error) {
-    const causeCode = error.cause?.code ? ` (${error.cause.code})` : "";
-    console.error(`Discord API preflight failed: ${error.name}${causeCode}: ${error.message}`);
-    throw new Error("Could not reach the Discord API from this service.");
+  while (true) {
+    try {
+      discordApiResponse = await fetch("https://discord.com/api/v10/gateway/bot", {
+        headers: { Authorization: `Bot ${token}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      const causeCode = error.cause?.code ? ` (${error.cause.code})` : "";
+      console.error(`Discord API preflight failed: ${error.name}${causeCode}: ${error.message}`);
+      throw new Error("Could not reach the Discord API from this service.");
+    }
+
+    if (discordApiResponse.status !== 429) break;
+
+    const rateLimit = await discordApiResponse.json();
+    const retryAfterSeconds = Number(rateLimit.retry_after);
+    const retryDelayMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+      ? Math.ceil(retryAfterSeconds * 1000)
+      : 5_000;
+    console.warn(`Discord API rate limit reached; retrying in ${Math.ceil(retryDelayMs / 1000)} seconds.`);
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+  }
+
+  if (discordApiResponse.status === 401) {
+    console.error("Discord API preflight returned HTTP 401. The DISCORD_TOKEN value in Render was rejected.");
+    throw new Error("Discord rejected the bot token.");
   }
   if (!discordApiResponse.ok) {
-    console.error(`Discord API preflight returned HTTP ${discordApiResponse.status}. Check the DISCORD_TOKEN value in Render.`);
-    throw new Error(`Discord API rejected the bot credentials (HTTP ${discordApiResponse.status}).`);
+    console.error(`Discord API preflight returned HTTP ${discordApiResponse.status}.`);
+    throw new Error(`Discord API preflight failed (HTTP ${discordApiResponse.status}).`);
   }
+  await discordApiResponse.body?.cancel();
   console.log("Discord API reachable; bot token accepted.");
 
   console.log("Connecting to Discord gateway.");
