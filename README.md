@@ -31,6 +31,10 @@ npm start
 
 `npm run deploy-commands` registers the command in the configured server. Keep the bot process running for commands to respond. Use `npm run restart` after code changes to stop the old process and start a replacement; if the bot is already stopped, it simply starts it. A second `npm start` is refused while another instance is running.
 
+## Render Web Service
+
+Use `npm install` as the build command and `npm start` as the start command. The bot listens on Render's `PORT` and serves `/` and `/healthz` as health checks; they return success after the bot connects to Discord. Add `DISCORD_TOKEN` and any other required bot settings as Render environment variables.
+
 ## Command
 
 `/kick member reason`, `/ban member reason`, and `/mute member duration reason` send the member a direct message containing the moderator's reason, then perform the action. The DM is updated to confirm the action after it succeeds. Mute durations are 5, 10, or 30 minutes; 1, 2, or 3 hours; 5 hours; 1 or 5 days; or 1 week. If the bot cannot deliver the DM, it does not perform these actions. `/unmute member` removes an active timeout, then DMs the member to let them know; if their DMs are closed, the timeout is still removed and the moderator is notified. `/warn member reason` sends the warning and reason to the member's DMs; it requires the **Moderate Members** permission. Use `/moderation log channel` to choose a text channel for successful moderation-action embeds. This requires **Manage Server**, and the bot needs **View Channel**, **Send Messages**, and **Embed Links** in the selected channel.

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { Client, Collection, Events, GatewayIntentBits, MessageFlags, Partials, PermissionFlagsBits } from "discord.js";
 import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 import lockfile from "proper-lockfile";
 import * as banCommand from "../commands/moderation/ban.js";
 import * as automodCommand from "../commands/automod.js";
@@ -102,6 +103,7 @@ const commands = new Collection([
 ]);
 let shuttingDown = false;
 let controlServer;
+let httpServer;
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
@@ -243,9 +245,10 @@ async function shutdown(signal) {
   shuttingDown = true;
   console.log(`Received ${signal}; shutting down.`);
   client.destroy();
-  if (controlServer?.listening) {
-    await new Promise((resolve) => controlServer.close(resolve));
-  }
+  await Promise.all([
+    controlServer?.listening ? new Promise((resolve) => controlServer.close(resolve)) : Promise.resolve(),
+    httpServer?.listening ? new Promise((resolve) => httpServer.close(resolve)) : Promise.resolve(),
+  ]);
   await releaseLock();
   process.exit(0);
 }
@@ -254,6 +257,27 @@ process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 try {
+  const port = process.env.PORT ? Number(process.env.PORT) : null;
+  if (port !== null) {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error("PORT must be a valid TCP port.");
+    }
+    httpServer = createHttpServer((request, response) => {
+      if (request.method === "GET" && (request.url === "/" || request.url === "/healthz")) {
+        response.writeHead(client.isReady() ? 200 : 503, { "content-type": "text/plain; charset=utf-8" });
+        response.end(client.isReady() ? "Bot is online\n" : "Bot is starting\n");
+        return;
+      }
+      response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      response.end("Not found\n");
+    });
+    await new Promise((resolve, reject) => {
+      httpServer.once("error", reject);
+      httpServer.listen(port, "0.0.0.0", resolve);
+    });
+    console.log(`Health server listening on port ${port}.`);
+  }
+
   controlServer = createServer((socket) => {
     let request = "";
     socket.on("data", (chunk) => {
@@ -297,6 +321,9 @@ try {
 } catch (error) {
   if (controlServer?.listening) {
     await new Promise((resolve) => controlServer.close(resolve));
+  }
+  if (httpServer?.listening) {
+    await new Promise((resolve) => httpServer.close(resolve));
   }
   await releaseLock();
   throw error;
