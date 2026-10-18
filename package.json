@@ -1,0 +1,19 @@
+{
+  "name": "taz-discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "restart": "node src/restart.js",
+    "deploy-commands": "node src/deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.21.0",
+    "dotenv": "^16.4.7",
+    "proper-lockfile": "^4.1.2"
+  }
+}

@@ -1,0 +1,12 @@
+.env
+node_modules/
+npm-debug.log*
+data/moderation-log-channels.json
+data/welcome-settings.json
+data/ticket-settings.json
+data/server-guides.json
+data/moderation-history.json
+data/automod-settings.json
+data/role-menu-settings.json
+data/twitch-settings.json
+data/command-access.json
