@@ -341,6 +341,24 @@ try {
     controlServer.listen(controlPath);
   });
 
+  console.log("Checking Discord API access and bot token.");
+  let discordApiResponse;
+  try {
+    discordApiResponse = await fetch("https://discord.com/api/v10/gateway/bot", {
+      headers: { Authorization: `Bot ${token}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    const causeCode = error.cause?.code ? ` (${error.cause.code})` : "";
+    console.error(`Discord API preflight failed: ${error.name}${causeCode}: ${error.message}`);
+    throw new Error("Could not reach the Discord API from this service.");
+  }
+  if (!discordApiResponse.ok) {
+    console.error(`Discord API preflight returned HTTP ${discordApiResponse.status}. Check the DISCORD_TOKEN value in Render.`);
+    throw new Error(`Discord API rejected the bot credentials (HTTP ${discordApiResponse.status}).`);
+  }
+  console.log("Discord API reachable; bot token accepted.");
+
   console.log("Connecting to Discord gateway.");
   let loginTimeout;
   try {
