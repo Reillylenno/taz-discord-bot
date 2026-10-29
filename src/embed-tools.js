@@ -254,26 +254,32 @@ export async function handleEmbedToolComponent(interaction) {
     }
 
     state.sending = true;
+    await interaction.deferUpdate();
+    let channel;
+    let embedCount;
     try {
-      const channel = await interaction.guild.channels.fetch(state.channelId);
+      channel = await interaction.guild.channels.fetch(state.channelId);
       const embeds = state.embeds.map((raw) => EmbedBuilder.from(raw));
+      embedCount = embeds.length;
       if (state.messageId) {
         const message = await channel.messages.fetch(state.messageId);
         await message.edit({ embeds });
       } else {
         await channel.send({ embeds });
       }
-
-      const currentKey = sessionKey(interaction.guildId, interaction.user.id);
-      if (sessions.get(currentKey) === state) sessions.delete(currentKey);
-      const result = state.messageId
-        ? "Embed message updated. Run /sendembed to start a new embed."
-        : `Sent ${embeds.length} embed(s) to <#${channel.id}>. Run /sendembed to start a new embed.`;
-      await interaction.update({ content: result, components: [] });
     } catch (error) {
       state.sending = false;
       throw error;
     }
+
+    state.embeds = [];
+    state.selected = 0;
+    const currentKey = sessionKey(interaction.guildId, interaction.user.id);
+    if (sessions.get(currentKey) === state) sessions.delete(currentKey);
+    const result = state.messageId
+      ? "Embed message updated. Draft cleared; run /sendembed to start a new embed."
+      : `Sent ${embedCount} embed(s) to <#${channel.id}>. Draft cleared; run /sendembed to start a new embed.`;
+    await interaction.editReply({ content: result, components: [] });
     return true;
   }
   return false;
