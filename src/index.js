@@ -12,11 +12,13 @@ import * as editEmbedCommand from "../commands/editembed.js";
 import * as clearWelcomeCommand from "../commands/clearwelcome.js";
 import * as commandAccessCommand from "../commands/commandaccess.js";
 import * as disableTwitchCommand from "../commands/disabletwitch.js";
+import * as disableYouTubeCommand from "../commands/disableyoutube.js";
 import * as editWelcomeCommand from "../commands/editwelcome.js";
 import * as editServerGuideCommand from "../commands/editserverguide.js";
 import * as twitchLinkCommand from "../commands/twitchlink.js";
 import * as twitchSubRoleCommand from "../commands/twitchsubrole.js";
 import * as setStreamerCommand from "../commands/setstreamer.js";
+import * as setYouTubeCommand from "../commands/setyoutube.js";
 import * as kickCommand from "../commands/moderation/kick.js";
 import * as moderationCommand from "../commands/moderation/moderation.js";
 import * as modlogCommand from "../commands/modlog.js";
@@ -37,6 +39,7 @@ import { handleTicketComponent } from "./ticket-system.js";
 import { buildServerGuide, getServerGuide } from "./server-guide.js";
 import { moderateMessage } from "./automod.js";
 import { pollLiveStreams } from "./twitch.js";
+import { pollYouTubeLiveStreams } from "./youtube.js";
 import { handleRoleButton, handleRoleReaction } from "./role-menus.js";
 import { handleEmbedToolComponent } from "./embed-tools.js";
 import { hasCommandAccess } from "./command-access.js";
@@ -96,7 +99,9 @@ const commands = new Collection([
   [editWelcomeCommand.data.name, editWelcomeCommand],
   [editServerGuideCommand.data.name, editServerGuideCommand],
   [setStreamerCommand.data.name, setStreamerCommand],
+  [setYouTubeCommand.data.name, setYouTubeCommand],
   [disableTwitchCommand.data.name, disableTwitchCommand],
+  [disableYouTubeCommand.data.name, disableYouTubeCommand],
   [twitchLinkCommand.data.name, twitchLinkCommand],
   [twitchSubRoleCommand.data.name, twitchSubRoleCommand],
   [ticketCommand.data.name, ticketCommand],
@@ -114,6 +119,9 @@ client.once(Events.ClientReady, (readyClient) => {
   void pollLiveStreams(client);
   const twitchPoll = setInterval(() => void pollLiveStreams(client), 60_000);
   twitchPoll.unref();
+  void pollYouTubeLiveStreams(client);
+  const youtubePoll = setInterval(() => void pollYouTubeLiveStreams(client), 15 * 60_000);
+  youtubePoll.unref();
 });
 
 client.on(Events.Error, (error) => {

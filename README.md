@@ -13,6 +13,7 @@ Add these entries to the existing local `.env` file. Keep any other settings alr
 DISCORD_TOKEN=your_new_bot_token
 CLIENT_ID=your_application_id
 GUILD_ID=your_server_id
+YOUTUBE_API_KEY=your_google_api_key
 ```
 
 Reset the bot token in the Discord Developer Portal before using it: the previous token was shared in chat. `CLIENT_ID` is the application ID, and `GUILD_ID` is the server ID.
@@ -55,6 +56,6 @@ Use `/editserverguide` to configure the guide embed and up to ten fields; member
 
 `/sendembed` opens a multi-slot editor for up to ten embeds, with preview and send/update controls. `/editembed` edits the first embed directly or opens the slot editor for a bot-authored message; `resend_to` copies the embeds. `/sendimage` sends an uploaded image attachment to a text channel.
 
-`/setstreamer` and `/disabletwitch` manage live alerts. They require `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET` in `.env`. `/twitchlink link` starts account verification by asking the user to place a one-time code in their Twitch profile description; `/twitchlink verify` completes it. For subscriber roles, configure `/twitchsubrole` and set `TWITCH_BROADCASTER_ID` and `TWITCH_BROADCASTER_TOKEN` locally; the token needs the `channel:read:subscriptions` scope.
+`/setstreamer` and `/disabletwitch` manage Twitch live alerts. They require `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET` in `.env`. `/setyoutube channel_id channel` and `/disableyoutube` manage YouTube live alerts; enable the YouTube Data API in Google Cloud, create an API key, add it as `YOUTUBE_API_KEY` in `.env`, then provide your 24-character YouTube channel ID (starts with `UC`). YouTube alerts are checked every 15 minutes to stay within the default API quota: YouTube's live search costs 100 quota units per check, and the default daily quota is 10,000 units. This means alerts may take up to 15 minutes to arrive. `/twitchlink link` starts account verification by asking the user to place a one-time code in their Twitch profile description; `/twitchlink verify` completes it. For subscriber roles, configure `/twitchsubrole` and set `TWITCH_BROADCASTER_ID` and `TWITCH_BROADCASTER_TOKEN` locally; the token needs the `channel:read:subscriptions` scope.
 
 `/commandaccess` can delegate `/automod`, `/moderation`, `/modlog`, `/ticket`, and `/twitchsubrole`. Native staff permissions continue to grant access; delegated access can be denied by role.

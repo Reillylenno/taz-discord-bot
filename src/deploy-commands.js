@@ -9,11 +9,13 @@ import * as editEmbedCommand from "../commands/editembed.js";
 import * as clearWelcomeCommand from "../commands/clearwelcome.js";
 import * as commandAccessCommand from "../commands/commandaccess.js";
 import * as disableTwitchCommand from "../commands/disabletwitch.js";
+import * as disableYouTubeCommand from "../commands/disableyoutube.js";
 import * as editWelcomeCommand from "../commands/editwelcome.js";
 import * as editServerGuideCommand from "../commands/editserverguide.js";
 import * as twitchLinkCommand from "../commands/twitchlink.js";
 import * as twitchSubRoleCommand from "../commands/twitchsubrole.js";
 import * as setStreamerCommand from "../commands/setstreamer.js";
+import * as setYouTubeCommand from "../commands/setyoutube.js";
 import * as kickCommand from "../commands/moderation/kick.js";
 import * as moderationCommand from "../commands/moderation/moderation.js";
 import * as modlogCommand from "../commands/modlog.js";
@@ -59,7 +61,9 @@ await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
     editWelcomeCommand.data.toJSON(),
     editServerGuideCommand.data.toJSON(),
     setStreamerCommand.data.toJSON(),
+    setYouTubeCommand.data.toJSON(),
     disableTwitchCommand.data.toJSON(),
+    disableYouTubeCommand.data.toJSON(),
     twitchLinkCommand.data.toJSON(),
     twitchSubRoleCommand.data.toJSON(),
     ticketCommand.data.toJSON(),

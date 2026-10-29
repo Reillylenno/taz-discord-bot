@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -18,7 +19,7 @@ function sessionKey(guildId, userId) {
   return `${guildId}:${userId}`;
 }
 
-function editorRows(embeds, selected = 0) {
+function editorRows(editorId, embeds, selected = 0) {
   const slots = Array.from({ length: 10 }, (_, index) => ({
     label: `Embed ${index + 1}${embeds[index] ? " (saved)" : ""}`,
     value: String(index),
@@ -26,20 +27,20 @@ function editorRows(embeds, selected = 0) {
   }));
   return [
     new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
-      .setCustomId("embed-tool:select")
+      .setCustomId(`embed-tool:${editorId}:select`)
       .setPlaceholder("Choose an embed slot")
       .addOptions(slots)),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("embed-tool:edit").setLabel("Edit selected").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("embed-tool:preview").setLabel("Preview").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("embed-tool:send").setLabel("Send all embeds").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`embed-tool:${editorId}:edit`).setLabel("Edit selected").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`embed-tool:${editorId}:preview`).setLabel("Preview").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`embed-tool:${editorId}:send`).setLabel("Send all embeds").setStyle(ButtonStyle.Success),
     ),
   ];
 }
 
-function createModal(guildId, userId, index, embedData = {}) {
+function createModal(guildId, userId, editorId, index, embedData = {}) {
   const modal = new ModalBuilder()
-    .setCustomId(`embed-tool:modal:${guildId}:${userId}:${index}`)
+    .setCustomId(`embed-tool:modal:${guildId}:${userId}:${editorId}:${index}`)
     .setTitle(`Edit embed ${index + 1}`);
   const inputs = [
     ["title", "Title", TextInputStyle.Short, embedData.title ?? "", 256],
@@ -71,15 +72,17 @@ function isHttpUrl(value) {
 
 async function openEditor(interaction, { channel, message, embeds }) {
   const state = {
+    editorId: randomUUID(),
     channelId: channel.id,
     messageId: message?.id ?? null,
     embeds: embeds.slice(0, 10),
     selected: 0,
+    sending: false,
   };
   sessions.set(sessionKey(interaction.guildId, interaction.user.id), state);
   await interaction.editReply({
     content: `Embed editor for <#${channel.id}>. Choose a slot to edit, preview the embeds, or send them all.`,
-    components: editorRows(state.embeds),
+    components: editorRows(state.editorId, state.embeds),
   });
 }
 
@@ -93,38 +96,7 @@ export async function executeSendEmbed(interaction) {
     return;
   }
 
-  const key = sessionKey(interaction.guildId, interaction.user.id);
-  let state = sessions.get(key);
-  const messageId = interaction.options.getString("message_id");
-  let message = null;
-  let embeds = [];
-  if (messageId) {
-    message = await channel.messages.fetch(messageId).catch(() => null);
-    if (!message || message.author.id !== interaction.client.user.id) {
-      await interaction.editReply("I can only edit a message authored by this bot.");
-      return;
-    }
-    embeds = message.embeds.map((embed) => embed.toJSON());
-  } else if (state?.channelId === channel.id) {
-    embeds = state.embeds;
-  }
-
-  const sendNow = interaction.options.getBoolean("send_now") ?? false;
-  if (sendNow) {
-    if (embeds.length === 0) {
-      await interaction.editReply("There are no saved embeds to send. Run /sendembed without send_now to open the editor first.");
-      return;
-    }
-    if (message) {
-      await message.edit({ embeds: embeds.slice(0, 10) });
-      await interaction.editReply("Saved embeds applied to the selected message.");
-    } else {
-      await channel.send({ embeds: embeds.slice(0, 10) });
-      await interaction.editReply(`Sent ${embeds.length} embed(s) to <#${channel.id}>.`);
-    }
-    return;
-  }
-  await openEditor(interaction, { channel, message, embeds });
+  await openEditor(interaction, { channel, message: null, embeds: [] });
 }
 
 export async function executeEditEmbed(interaction) {
@@ -197,9 +169,9 @@ export async function executeEditEmbed(interaction) {
 }
 
 async function saveModal(interaction) {
-  const [, , guildId, userId, indexText] = interaction.customId.split(":");
+  const [, , guildId, userId, editorId, indexText] = interaction.customId.split(":");
   const state = sessions.get(sessionKey(guildId, userId));
-  if (interaction.guildId !== guildId || interaction.user.id !== userId || !state) {
+  if (interaction.guildId !== guildId || interaction.user.id !== userId || state?.editorId !== editorId) {
     await interaction.reply({ content: "This embed editor expired. Run the command again.", flags: MessageFlags.Ephemeral });
     return;
   }
@@ -246,22 +218,23 @@ export async function handleEmbedToolComponent(interaction) {
   }
   const key = sessionKey(interaction.guildId, interaction.user.id);
   const state = sessions.get(key);
-  if (!state) {
+  const [, editorId, action] = interaction.customId.split(":");
+  if (state?.editorId !== editorId) {
     await interaction.reply({ content: "This embed editor expired. Run the command again.", flags: MessageFlags.Ephemeral });
     return true;
   }
-  if (interaction.isStringSelectMenu() && interaction.customId === "embed-tool:select") {
+  if (interaction.isStringSelectMenu() && action === "select") {
     state.selected = Number(interaction.values[0]);
     sessions.set(key, state);
-    await interaction.update({ content: `Selected embed ${state.selected + 1}.`, components: editorRows(state.embeds, state.selected) });
+    await interaction.update({ content: `Selected embed ${state.selected + 1}.`, components: editorRows(state.editorId, state.embeds, state.selected) });
     return true;
   }
   if (!interaction.isButton()) return false;
-  if (interaction.customId === "embed-tool:edit") {
-    await interaction.showModal(createModal(interaction.guildId, interaction.user.id, state.selected, state.embeds[state.selected]));
+  if (action === "edit") {
+    await interaction.showModal(createModal(interaction.guildId, interaction.user.id, state.editorId, state.selected, state.embeds[state.selected]));
     return true;
   }
-  if (interaction.customId === "embed-tool:preview") {
+  if (action === "preview") {
     const embeds = state.embeds.map((raw) => EmbedBuilder.from(raw));
     if (!embeds.length) {
       await interaction.reply({ content: "No embeds have been saved yet.", flags: MessageFlags.Ephemeral });
@@ -270,21 +243,36 @@ export async function handleEmbedToolComponent(interaction) {
     await interaction.reply({ flags: MessageFlags.Ephemeral, embeds });
     return true;
   }
-  if (interaction.customId === "embed-tool:send") {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const channel = await interaction.guild.channels.fetch(state.channelId);
-    const embeds = state.embeds.map((raw) => EmbedBuilder.from(raw));
-    if (!embeds.length) {
-      await interaction.editReply("No embeds have been saved yet.");
+  if (action === "send") {
+    if (!state.embeds.length) {
+      await interaction.reply({ content: "No embeds have been saved yet.", flags: MessageFlags.Ephemeral });
       return true;
     }
-    if (state.messageId) {
-      const message = await channel.messages.fetch(state.messageId);
-      await message.edit({ embeds });
-      await interaction.editReply("Embed message updated.");
-    } else {
-      await channel.send({ embeds });
-      await interaction.editReply(`Sent ${embeds.length} embed(s) to <#${channel.id}>.`);
+    if (state.sending) {
+      await interaction.reply({ content: "This embed is already being sent.", flags: MessageFlags.Ephemeral });
+      return true;
+    }
+
+    state.sending = true;
+    try {
+      const channel = await interaction.guild.channels.fetch(state.channelId);
+      const embeds = state.embeds.map((raw) => EmbedBuilder.from(raw));
+      if (state.messageId) {
+        const message = await channel.messages.fetch(state.messageId);
+        await message.edit({ embeds });
+      } else {
+        await channel.send({ embeds });
+      }
+
+      const currentKey = sessionKey(interaction.guildId, interaction.user.id);
+      if (sessions.get(currentKey) === state) sessions.delete(currentKey);
+      const result = state.messageId
+        ? "Embed message updated. Run /sendembed to start a new embed."
+        : `Sent ${embeds.length} embed(s) to <#${channel.id}>. Run /sendembed to start a new embed.`;
+      await interaction.update({ content: result, components: [] });
+    } catch (error) {
+      state.sending = false;
+      throw error;
     }
     return true;
   }
